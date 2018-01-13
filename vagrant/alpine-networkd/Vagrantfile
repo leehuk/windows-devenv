@@ -1,0 +1,32 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# alpine-networkd
+# A minimal alpine vm providing dhcp and dns services for the HyperV NAT network
+
+Vagrant.configure("2") do |config|
+  config.vm.box = "generic/alpine36"
+
+  config.vm.provider "hyperv" do |hyperv|
+    hyperv.vmname = "networkd"
+    hyperv.cpus = "2"
+    hyperv.memory = "128"
+    hyperv.maxmemory = "256"
+  end
+
+  # setup networking, using google dns temporarily
+  config.vm.provision :file, source: "files/etc-network-interfaces", destination: "/tmp/interfaces.vagrant"
+  config.vm.provision :shell, inline: "sudo cp /tmp/interfaces.vagrant /etc/network/interfaces"
+  config.vm.provision :shell, inline: "sudo bash -c 'echo nameserver 8.8.8.8 > /etc/resolv.conf'"
+  config.vm.provision :shell, inline: "sudo bash -c 'echo networkd > /etc/hostname'"
+
+  config.vm.provision :reload
+
+  # prepare dnsmasq for dns + dhcp services
+  config.vm.provision :file, source: "files/etc-dnsmasq.conf", destination: "/tmp/dnsmasq.conf.vagrant"
+  config.vm.provision :shell, path: "files/install.sh"
+
+  # now we have dnsmasq, add proper resolv.conf using localhost
+  config.vm.provision :file, source: "files/etc-resolv.conf", destination: "/tmp/resolv.conf.vagrant"
+  config.vm.provision :shell, inline: "sudo cp /tmp/resolv.conf.vagrant /etc/resolv.conf"
+end
