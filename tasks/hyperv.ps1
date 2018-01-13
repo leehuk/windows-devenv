@@ -45,11 +45,11 @@ try {
 
 Write-Host "Checking for NAT Network"
 try {
-	Get-NetIPAddress -IPAddress 172.31.255.0 -PrefixLength 24 -InterfaceAlias "vEthernet (HyperV-NAT)" -ErrorAction Stop | Out-Null
+	Get-NetIPAddress -IPAddress 172.31.255.254 -PrefixLength 24 -InterfaceAlias "vEthernet (HyperV-NAT)" -ErrorAction Stop | Out-Null
 	Write-Host "Found NAT Network"
 } catch {
 	Write-Host "Creating NAT Network"
-	New-NetIPAddress -IPAddress 172.31.255.0 -PrefixLength 24 -InterfaceAlias “vEthernet (HyperV-NAT)” | Out-Null
+	New-NetIPAddress -IPAddress 172.31.255.254 -PrefixLength 24 -InterfaceAlias “vEthernet (HyperV-NAT)” | Out-Null
 }
 
 Write-Host "Checking for Hyper-V NAT"
