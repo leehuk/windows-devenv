@@ -61,13 +61,12 @@ fi
 # priority over the removals specified in %packages:
 # https://bugzilla.redhat.com/show_bug.cgi?id=1412398
 #
-# Forcibly remove the packages we dont want
+# Forcibly remove the packages we dont want as the last dnf stage, as
+# the removal appears to block other installations
 dnf remove -y audit firewalld GeoIP iproute-tc kpartx linux-firmware NetworkManager pigz pinentry polkit selinux-policy sssd-client trousers
 
 # Enable the basic networking initialisation in place of networkmanager
 chkconfig network on
-
-sleep 1500
 
 # Grant vagrant sudo privs
 echo "vagrant ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/vagrant
