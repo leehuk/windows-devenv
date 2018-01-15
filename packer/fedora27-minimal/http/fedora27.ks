@@ -54,7 +54,7 @@ virt-what
 # HyperV Integration
 if [ $(virt-what) == "hyperv" ]; then
   dnf install -y hyperv-daemons
-  systemctl enable hypervkvpd
+  systemctl enable hypervkvpd cifs-utils
 fi
 
 # There appears to be a bug in anaconda, meaning recommends are taking
