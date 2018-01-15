@@ -65,6 +65,8 @@ fi
 # the removal appears to block other installations
 dnf remove -y audit firewalld GeoIP iproute-tc kpartx linux-firmware NetworkManager pigz pinentry polkit selinux-policy sssd-client trousers
 
+dnf clean all
+
 # Enable the basic networking initialisation in place of networkmanager
 chkconfig network on
 
