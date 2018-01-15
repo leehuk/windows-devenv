@@ -4,7 +4,7 @@
 		"http_directory": "http",
 		"output_directory": "build",
 
-		"vm_name": "packer-fedora27-minimal",
+		"vm_name": "packer-fedora27",
 		"cpu": "2",
 		"ram_size": "2048",
 		"disk_size": "10000",
@@ -27,7 +27,7 @@
 
 	}],
 	"post-processors": [{
-		"output": "./fedora27-minimal-hyperv-gen2.box",
+		"output": "../../boxes/fedora27-minimal-hyperv-gen2.box",
 		"type": "vagrant"
 	}]
 }
