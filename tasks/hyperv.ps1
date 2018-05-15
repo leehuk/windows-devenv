@@ -60,3 +60,95 @@ try {
 	Write-Host "Creating Hyper-V NAT"
 	New-NetNAT -Name "HyperV-NAT" -InternalIPInterfaceAddressPrefix 172.31.255.0/24
 }
+
+Write-Host "Checking for HyperV Storage Folder"
+try {
+	Get-Item "C:\HyperV" -ErrorAction stop | Out-Null
+	Write-Host "Found C:\HyperV"
+
+	if(-Not ((Get-Item C:\HyperV) -is [System.IO.DirectoryInfo])) {
+		Write-Host "C:\HyperV is not a directory, removing"
+		Remove-Item C:\HyperV
+
+		Write-Host "Creating C:\HyperV"
+		New-Item -Path C:\ -Name "HyperV" -ItemType "directory"
+	}
+} catch {
+	Write-Host "Creating C:\HyperV"
+	New-Item -Path C:\ -Name "HyperV" -ItemType "directory"
+}
+
+Write-Host "Checking for HyperV Storage VHD Folder"
+try {
+	Get-Item "C:\HyperV\VHDs" -ErrorAction stop | Out-Null
+	Write-Host "Found C:\HyperV\VHDs"
+} catch {
+	Write-Host "Creating C:\HyperV\VHDs"
+	New-Item -Path C:\HyperV -Name "VHDs" -ItemType "directory"
+}
+
+Write-Host "Looking up account information"
+$UserIdentity = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+$UserIdentityName = $UserIdentity.Name
+$UserAccount = New-Object -TypeName System.Security.Principal.NTAccount -ArgumentList $UserIdentityName
+
+$WorkPath = "C:\HyperV"
+Write-Host "Checking ownership of $WorkPath"
+$ACL = Get-ACL $WorkPath
+if($ACL.Owner -ne $UserIdentityName) {
+	Write-Host "Changing ownership of $WorkPath"
+	$ACL.SetOwner($UserAccount)
+	Set-ACL $WorkPath -AclObject $ACL
+}
+
+$WorkPath = "C:\HyperV\VHDs"
+Write-Host "Checking ownership of $WorkPath"
+$ACL = Get-ACL $WorkPath
+if($ACL.Owner -ne $UserIdentityName) {
+	Write-Host "Changing ownership of $WorkPath"
+	$ACL.SetOwner($UserAccount)
+	Set-ACL $WorkPath -AclObject $ACL
+}
+
+$WorkPath = "C:\HyperV"
+Write-Host "Checking permissions of $WorkPath"
+$ACL = Get-ACL $WorkPath
+
+$AccessFoundUser = $False
+$AccessFoundSystem = $False
+$AccessFoundOther = $False
+
+foreach($Access in $ACL.Access) {
+	if($Access.FileSystemRights -eq "FullControl" -And $Access.IdentityReference -eq $UserIdentityName) {
+		$AccessFoundUser = $True
+	} elseif($Access.FileSystemRights -eq "FullControl" -And $Access.IdentityReference -eq "NT AUTHORITY\SYSTEM") {
+		$AccessFoundSystem = $True
+	} else {
+		$AccessFoundOther = $True
+	}
+}
+
+if($AccessFoundOther -Or -Not $AccessFoundUser -Or -Not $AccessFoundSystem) {
+	Write-Host "Resetting permissions on $WorkPath"
+
+	# Clear Inheritance
+	$ACL.SetAccessRuleProtection($True, $True)
+
+	foreach($Access in $ACL.Access) {
+		$ACL.RemoveAccessRule($Access)
+	}
+
+	$AccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule($UserIdentityName, 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
+	$ACL.SetAccessRule($AccessRule)
+
+	$AccessRule = New-Object System.Security.AccessControl.FileSystemAccessRule('SYSTEM', 'FullControl', 'ContainerInherit,ObjectInherit', 'None', 'Allow')
+	$ACL.SetAccessRule($AccessRule)
+
+	Set-ACL $WorkPath -AclObject $ACL
+}
+
+Write-Host "Checking HyperV VHD Directory"
+if((Get-VMHost).VirtualHardDiskPath -ne "C:\HyperV\VHDs") {
+	Write-Host "Setting HyperV VHD Directory"
+	Set-VMHost -VirtualHardDiskPath "C:\HyperV\VHDs"
+}
