@@ -141,6 +141,10 @@ if($Module -eq 'vm') {
 			exit
 		}
 
+		if($status -eq [VMStatus]::Running) {
+			Stop-VM $VMName
+		}
+
 		$confirm = Read-Host "This will permanently *DESTROY* the VM and its root hard disk.  Enter YES to continue"
 		if($confirm -eq "YES") {
 			Get-VMHardDiskDrive $VMName | Remove-VMHardDiskDrive
