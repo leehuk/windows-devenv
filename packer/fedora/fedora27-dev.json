@@ -1,0 +1,33 @@
+{
+	"builders": [{
+		"type": "hyperv-iso",
+		"http_directory": "http",
+		"output_directory": "build",
+
+		"vm_name": "packer-fedora27-box",
+		"cpu": "2",
+		"ram_size": "2048",
+		"disk_size": "10000",
+		"switch_name": "HyperV-NAT",
+		"generation": "2",
+
+		"iso_url": "https://mirror.bytemark.co.uk/fedora/linux/releases/27/Server/x86_64/iso/Fedora-Server-netinst-x86_64-27-1.6.iso",
+		"iso_checksum": "e9223711ba270c2c90dd644c9b95545af062be1a",
+		"iso_checksum_type": "sha1",
+
+		"boot_command": [
+			"<up>e<wait><down><down><end> biosdevname=0 ks=http://{{ .HTTPIP }}:{{ .HTTPPort }}/fedora27.ks<leftCtrlOn>x<leftCtrlOff><wait>"
+		],
+		"boot_wait": "10s",
+		"shutdown_command": "sudo shutdown -P now",
+
+		"ssh_username": "packer",
+		"ssh_password": "packer",
+		"ssh_timeout": "1h"
+
+	}],
+	"post-processors": [{
+		"output": "../../boxes/fedora27-hyperv-gen2.zip",
+		"type": "compress"
+	}]
+}

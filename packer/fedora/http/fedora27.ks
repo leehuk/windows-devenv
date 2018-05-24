@@ -16,7 +16,7 @@ network  --bootproto=dhcp --device=eth0 --ipv6=auto --activate
 network  --hostname=localhost.localdomain
 # User accounts
 rootpw --iscrypted $6$JjiD8//K4owApakd$j1QFDYJYkNLKMohgZxaMeowvFzzbDV7QlhpK4s5YR41htsLYRW6WOnP8FlTPTc8OHGiQZm5SdUvOHeICVaTd2.
-user --name=vagrant --password=$6$idMvtY6Ik6qh9FR6$UmAYRxza5NWCZmo35MvJ/lcVJ8/B5nGNOVV1jOy3Mux6A/z8yGoiXrrxa7UFzodkQdjK1y9VTdPNN.0B97pQU/ --iscrypted --gecos="vagrant"
+user --name=vagrant --password=$6$aONeZ7dNk85m7LsR$c7QfV6mYwZspARbNSvODTlxP2imeDW3GymcV9/KBPad1AzQn5tHMU2JKGrqtYq4jjR4spe/SaXp36dqvp95dG0 --iscrypted --gecos="packer"
 # System bootloader configuration
 bootloader --location=mbr
 # Partition clearing information
@@ -70,6 +70,6 @@ dnf clean all
 # Enable the basic networking initialisation in place of networkmanager
 chkconfig network on
 
-# Grant vagrant sudo privs
-echo "vagrant ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/vagrant
+# Grant packer sudo privs
+echo "packer ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers.d/packer
 %end
