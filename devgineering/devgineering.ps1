@@ -42,7 +42,9 @@ function display_help {
 	Write-Host
 	Write-Host "   vm destroy         - Destroys the dev VM"
 	Write-Host "   vm provision       - Provisions the dev VM"
+	Write-Host "   vm start           - Start the dev VM"
 	Write-Host "   vm status          - Show status of devgineering VM"
+	Write-Host "   vm stop            - Stop the dev VM"
 	Write-Host
 	Write-Host " template - Manage VHD Template"
 	Write-Host
@@ -158,6 +160,12 @@ if($Module -eq 'vm') {
 			}
 		} 
 
+		$template = Get-Item "$TemplateVHDPath" -ErrorAction Ignore
+		if(-Not $template) {
+			Write-Error "Template is not provisioned"
+			exit
+		}
+
 		if($status -lt [VMStatus]::Provisioned) {
 			$provstatus = get_provisionstatus
 
@@ -197,6 +205,24 @@ if($Module -eq 'vm') {
 	} elseif($Command -eq 'status') {
 		$status = get_vmstatus
 		Write-Host "$VMName is $status"
+	# vm start
+	} elseif($Command -eq 'start') {
+		$status = get_vmstatus
+		if($status -lt [VMStatus]::Provisioned) {
+			Write-Error "$VMName is not provisioned"
+			exit
+		}
+
+		Start-VM $VMName
+	# vm stop
+	} elseif($Command -eq 'stop') {
+		$status = get_vmstatus
+		if($status -lt [VMStatus]::Running) {
+			Write-Error "$VMName is not running"
+			exit
+		}
+
+		Stop-VM $VMName
 	} else {
 		display_help
 	}
