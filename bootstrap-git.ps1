@@ -16,7 +16,7 @@ $HomeUnixPath = ("/" + $Matches[1].ToLower() + $Matches[2].Replace('\','/'))
 $VendorPath = "C:\tools\cmder\vendor"
 $SshConfigPath = ($Home + "\.ssh\config")
 $SshKeyPath = ($Home + "\.ssh\id_git")
-$GitWorkPath = ($Home + "\git")
+$GitWorkPath = ("\git")
 
 $gitfile = Get-Item $SshKeyPath -ErrorAction SilentlyContinue
 if($gitfile -eq $null) {
