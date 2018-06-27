@@ -6,6 +6,7 @@
 
 Vagrant.configure("2") do |config|
   config.vm.box = "generic/alpine36"
+  config.vm.box_version = "1.3.30"
 
   config.vm.provider "hyperv" do |hyperv|
     hyperv.vmname = "networkd"
