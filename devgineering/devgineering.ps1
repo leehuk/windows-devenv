@@ -44,6 +44,8 @@ function display_help {
 	Write-Host
 	Write-Host "[devgineering] Dev VM Builder"
 	Write-Host
+	Write-Host " status - Show Status Information"
+	Write-Host
 	Write-Host " env - Manage Dev Environment"
 	Write-Host "   env status         - Show status of dev environment"
 	Write-Host
@@ -52,14 +54,12 @@ function display_help {
 	Write-Host "   vm destroy         - Destroys the dev VM"
 	Write-Host "   vm provision       - Provisions the dev VM"
 	Write-Host "   vm start           - Start the dev VM"
-	Write-Host "   vm status          - Show status of devgineering VM"
 	Write-Host "   vm stop            - Stop the dev VM"
 	Write-Host
 	Write-Host " template - Manage VHD Template"
 	Write-Host
 	Write-Host "   template provision - Provision packer box to HyperV VHD template"
 	Write-Host "                        Parameters: <-BoxFile /path/to/box>"
-	Write-Host "   template status    - Show template VHD status"
 	Write-Host
 	Write-Host " help - This help"
 	Write-Host
@@ -140,7 +140,7 @@ function get_provisionstatus {
 	}
 
 	if(($vm.NetworkAdapters).Count -eq 1) {
-		$status['NICCount'] = True
+		$status['NICCount'] = $True
 	}
 
 	return $status
@@ -171,7 +171,34 @@ function get_envinfo {
 	return $status
 }
 
-if($Module -eq 'vm') {
+if($Module -eq 'status') {
+	$template = Get-Item "$TemplateVHDPath" -ErrorAction Ignore
+	if($template) {
+		Write-Host "devgineering-template: Provisioned"
+
+		$info = Get-Item "$TemplateInfoPath" -ErrorAction Ignore
+		if($info) {
+			$content = Get-Content $info
+			Write-Host "devgineering-template: $content"
+		}
+	} else {
+		Write-Host "devgineering-template: Unprovisioned"
+	}
+
+
+	$status = get_vmstatus
+	Write-Host "devgineering-vm: $status"
+
+	$provstatus = get_provisionstatus
+	$status = ''
+	foreach($k in $provstatus.Keys) {
+		$v = $provstatus[$k]
+		$status = "$status $k=$v"
+	}
+
+	Write-Host "devgineering-vm:$status"
+		
+} elseif($Module -eq 'vm') {
 	if($Command -eq "destroy") {
 		$status = get_vmstatus
 		if($status -le [VMStatus]::NotCreated) {
@@ -243,10 +270,6 @@ if($Module -eq 'vm') {
 				Set-VMProcessor $VMName -Count $VMCPU
 			}
 		}
-	# vm status
-	} elseif($Command -eq 'status') {
-		$status = get_vmstatus
-		Write-Host "$VMName is $status"
 	# vm start
 	} elseif($Command -eq 'start') {
 		$status = get_vmstatus
@@ -315,19 +338,6 @@ if($Module -eq 'vm') {
 
 		# Cleanup temporary path
 		Remove-Item -Recurse "$temppath"
-	} elseif($Command -eq "status") {
-		$template = Get-Item "$TemplateVHDPath" -ErrorAction Ignore
-		if($template) {
-			Write-Host "devgineering-template Provisioned"
-			Write-Host "Last Modified:"$template.LastWriteTime
-
-			$info = Get-Item "$TemplateInfoPath" -ErrorAction Ignore
-			if($info) {
-				Get-Content $info
-			}
-		} else {
-			Write-Host "devgineering-template Unprovisioned"
-		}
 	} else {
 		display_help
 	}
