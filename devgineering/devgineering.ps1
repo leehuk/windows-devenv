@@ -24,6 +24,12 @@ enum VMStatus {
 	Running       = 3
 }
 
+enum EnvStatus {
+	Unknown			= 0
+	Unprovisioned	= 1
+	Provisioned		= 2
+}
+
 $VMName = "devgineering"
 $VMMemory = (2*1024*1024*1024)
 $VMCPU = 2
@@ -37,6 +43,9 @@ $VMStoreVHDPath = "$VHDPath\devgineering-store.vhdx"
 function display_help {
 	Write-Host
 	Write-Host "[devgineering] Dev VM Builder"
+	Write-Host
+	Write-Host " env - Manage Dev Environment"
+	Write-Host "   env status         - Show status of dev environment"
 	Write-Host
 	Write-Host " vm - Manage Virtual Machine"
 	Write-Host
@@ -92,6 +101,7 @@ function get_provisionstatus {
 		'DiskRootAttached'  = $False
 		'DiskStore'         = $False
 		'DiskStoreAttached' = $False
+		'NicCount'			= $False
 		'SecureBoot'		= $False
 	}
 
@@ -129,9 +139,37 @@ function get_provisionstatus {
 		$status['CPUCount'] = $True
 	}
 
+	if(($vm.NetworkAdapters).Count -eq 1) {
+		$status['NICCount'] = True
+	}
+
 	return $status
 }
 
+function get_envstatus {
+	$vmstatus = get_vmstatus
+
+	if($vmstatus -lt [VMStatus]::Running) {
+		return [EnvStatus]::Unknown
+	}
+
+	return [EnvStatus]::Provisioned
+}
+
+function get_envinfo {
+	$status = @{
+		'IPAddress'	= $False
+	}
+
+	$vmnic = (Get-VM -Name $VMName).NetworkAdapters
+	($vmnic).IPAddresses | Foreach-Object -Process {
+		if($_ -Match "^172.31.255.") {
+			$status['IPAddress'] = $_
+		}
+	}
+
+	return $status
+}
 
 if($Module -eq 'vm') {
 	if($Command -eq "destroy") {
@@ -253,25 +291,15 @@ if($Module -eq 'vm') {
 			Remove-Item "$TemplateInfoPath"
 		}
 
-		# The packer box files are tar.gz, we need 7zip to extract them
-		if (-Not (Get-Command Expand-7Zip -ErrorAction Ignore)) {
-			Install-Package -Scope CurrentUser -Force 7Zip4PowerShell
-		}
-
 		$temppath = "$env:TEMP\devgineering"
-		$tempvhdpath = "$temppath\Virtual Hard Disks"
+		$tempvhdpath = "$temppath\build\Virtual Hard Disks"
+
+		if((Get-Item "$temppath" -ErrorAction Ignore)) {
+			Remove-Item "$temppath"
+		}
 
 		# The first extract gives us the tar file, the second the actual contents
-		Expand-7zip $BoxFile "$temppath"
-
-		$files = Get-Item "$temppath\*.tar" -ErrorAction Ignore
-		if($files.Count -ne 1) {
-			Write-Error "Unable to find exactly one tar file in $temppath"
-			exit
-		}
-
-		$tarpath = $temppath + "\" + $files[0].Name
-		Expand-7zip "$tarpath" "$temppath"
+		Expand-Archive $BoxFile -DestinationPath "$temppath"
 
 		$files = Get-Item "$tempvhdpath\*.vhdx" -ErrorAction Ignore
 		if($files.Count -ne 1) {
@@ -299,6 +327,19 @@ if($Module -eq 'vm') {
 			}
 		} else {
 			Write-Host "devgineering-template Unprovisioned"
+		}
+	} else {
+		display_help
+	}
+} elseif($Module -eq 'env') {
+	if($Command -eq "status") {
+		$status = get_envstatus
+		Write-Host "$VMName Environment is $status"
+
+		$info = get_envinfo
+		if($status -ge [EnvStatus]::Provisioned) {
+			Write-Host
+			Write-Host "IP Address:", $info['IPAddress']
 		}
 	} else {
 		display_help
