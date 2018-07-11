@@ -34,16 +34,22 @@ $TemplateInfoPath = "$VHDPath\devgineering-template.info"
 $VMRootVHDPath = "$VHDPath\devgineering-root.vhdx"
 $VMStoreVHDPath = "$VHDPath\devgineering-store.vhdx"
 
+$SSHKeyFolder = "C:\HyperV\packer.ssh"
+$SSHKeyFile = "$SSHKeyFolder\id_ed25519"
+$SSHKeyPubFile = "$SSHKeyFile.pub"
+
 function display_help {
 	Write-Host
 	Write-Host "[devgineering] Dev VM Builder"
 	Write-Host
 	Write-Host " status          - Show Status Information"
 	Write-Host
-	Write-Host " destroy         - Destroy VM"
-	Write-Host " stop            - Stop VM"
-	Write-Host " templatesync    - Provision VHD Template"
 	Write-Host " up              - Provision Environment"
+	Write-Host " stop            - Stop VM"
+	Write-Host " destroy         - Destroy VM"
+	Write-Host " ssh             - SSH to VM"
+	Write-Host
+	Write-Host " templatesync    - Provision VHD Template"
 	Write-Host
 	Write-Host " help - This help"
 	Write-Host
@@ -209,6 +215,41 @@ function provision_vm {
 	}
 }
 
+function provision_ssh {
+	if(-Not (Get-Item $SSHKeyFolder -ErrorAction Ignore)) {
+		New-Item $SSHKeyFolder -ItemType Directory | Out-Null
+	}
+
+	if(-Not (Get-Item $SSHKeyFile -ErrorAction Ignore)) {
+		ssh-keygen -q -t ed25519 -f $SSHKeyFile -N '""'
+	}
+
+	if(-Not (Get-Item $SSHKeyPubFile -ErrorAction Ignore)) {
+		Write-Host "devgineering-vm: Error: Found private key file, but missing public key file"
+		return
+	}
+
+	if((Get-Item $SSHKeyPubFile | Get-Content).Count -ne 1) {
+		Write-Host "devgineering-vm: Error: Public key file has multiple lines"
+		return
+	}
+
+	$info = get_vminfo
+	if(-Not $info['IPAddress'] -Match '^172.31.255.[0-9]+') {
+		Write-Host "devgineering-vm: Error: Invalid IP Address:", $info['IPAddress']
+		return
+	}
+
+	$result = $(ssh -i $SSHKeyFile -o StrictHostKeyChecking=false,PreferredAuthentications=publickey -l packer $info['IPAddress'] whoami 2>&1)
+	if($result -ne "packer") {
+		Write-Host "devgineering-vm: SSH Setup Required"
+		Write-Host "When prompted for a password, enter 'packer'"
+
+		$pubkey = (Get-Item $SSHKeyPubFile | Get-Content)
+		ssh -l packer $info['IPAddress'] "mkdir -p .ssh && chmod 700 .ssh && echo '$pubkey' > .ssh/authorized_keys && chmod 600 .ssh/authorized_keys"
+	}
+}
+
 function run_status {
 	$template = Get-Item "$TemplateVHDPath" -ErrorAction Ignore
 	if($template) {
@@ -237,6 +278,11 @@ function run_status {
 	}
 
 	Write-Host "devgineering-vm:$status"
+}
+
+function run_ssh {
+	$vminfo = get_vminfo
+	ssh -i $SSHKeyFile -o PreferredAuthentications=publickey -l packer $vminfo['IPAddress']
 }
 
 if($Module -eq 'status') {
@@ -288,7 +334,25 @@ if($Module -eq 'status') {
 
 	if($status -lt [VMStatus]::Running) {
 		Start-VM $VMName
+
+		Write-Progress "Waiting for IP Address" -SecondsRemaining 120
+		# We wait here until the VM has bound an IP address
+		for($i = 24; $i -gt 0; $i--) {
+			$vminfo = get_vminfo
+			if($vminfo['IPAddress']) {
+				break
+			}
+
+			Start-Sleep -Seconds 5
+			Write-Progress "Waiting for IP Address" -SecondsRemaining ($i*5)
+		}
+
+		# Give ssh a few seconds
+		Start-Sleep -Seconds 5
+		Write-Progress "Waiting for IP Address" -Completed
 	}
+
+	provision_ssh
 } elseif($Module -eq 'templatesync') {
 	if(-Not $BoxFile) {
 		Write-Error "-BoxFile not specified"
@@ -334,6 +398,14 @@ if($Module -eq 'status') {
 
 	# Cleanup temporary path
 	Remove-Item -Recurse "$temppath"
+} elseif($Module -eq "ssh") {
+	$status = get_vmstatus
+	if($status -lt [VMStatus]::Running) {
+		Write-Host "devgineering-vm: Not Running"
+		exit
+	}
+
+	run_ssh
 } else {
 	display_help
 }
