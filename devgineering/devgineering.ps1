@@ -18,15 +18,10 @@ param (
 
 enum VMStatus {
 	NotCreated    = 0
-	Unprovisioned = 1
-	Provisioned   = 2
+	Created		  = 1
+	Configured    = 2
 	Running       = 3
-}
-
-enum EnvStatus {
-	Unknown			= 0
-	Unprovisioned	= 1
-	Provisioned		= 2
+	Provisioned   = 4
 }
 
 $VMName = "devgineering"
@@ -72,17 +67,17 @@ function get_vmstatus {
 		return [VMStatus]::Running
 	}
 
-	$provstatus = get_provisionstatus
+	$provstatus = get_vmconfig
 	foreach($k in $provstatus.Keys) {
 		if($provstatus[$k] -ne $True) {
-			return [VMStatus]::Unprovisioned
+			return [VMStatus]::Created
 		}
 	}
 
-	return [VMStatus]::Provisioned
+	return [VMStatus]::Configured
 }
 
-function get_provisionstatus {
+function get_vmconfig {
 	$status = @{
 		'BootOrder'			= $False
 		'Checkpoints'		= $False
@@ -138,17 +133,7 @@ function get_provisionstatus {
 	return $status
 }
 
-function get_envstatus {
-	$vmstatus = get_vmstatus
-
-	if($vmstatus -lt [VMStatus]::Running) {
-		return [EnvStatus]::Unknown
-	}
-
-	return [EnvStatus]::Provisioned
-}
-
-function get_envinfo {
+function get_vminfo {
 	$status = @{
 		'IPAddress'	= $False
 	}
@@ -184,7 +169,7 @@ function provision_vm {
 		exit
 	}
 
-	$provstatus = get_provisionstatus
+	$provstatus = get_vmconfig
 
 	# Ensure checkpoints are disabled
 	if(-Not $provstatus['Checkpoints']) {
@@ -233,13 +218,18 @@ function run_status {
 			Write-Host "devgineering-template: $content"
 		}
 	} else {
-		Write-Host "devgineering-template: Unprovisioned"
+		Write-Host "devgineering-template: Created"
 	}
 
 	$status = get_vmstatus
 	Write-Host "devgineering-vm: $status"
 
-	$provstatus = get_provisionstatus
+	if($status -ge [VMStatus]::Running) {
+		$info = get_vminfo
+		Write-Host "devgineering-vm: IP", $info['IPAddress']
+	}
+
+	$provstatus = get_vmconfig
 	$status = ''
 	foreach($k in $provstatus.Keys) {
 		$v = $provstatus[$k]
@@ -247,14 +237,6 @@ function run_status {
 	}
 
 	Write-Host "devgineering-vm:$status"
-
-	$status = get_envstatus
-	Write-Host "devgineering-env: $status"
-
-	if($status -ge [EnvStatus]::Provisioned) {
-		$info = get_envinfo
-		Write-Host "devgineering-env: IP", $info['IPAddress']
-	}
 }
 
 if($Module -eq 'status') {
@@ -288,10 +270,10 @@ if($Module -eq 'status') {
 	provision_vm
 
 	$status = get_vmstatus
-	if($status -lt [VMStatus]::Provisioned) {
-		Write-Warning "devgineering-vm: Unprovisioned"
+	if($status -lt [VMStatus]::Configured) {
+		Write-Warning "devgineering-vm: Not Configured Correctly"
 
-		$provstatus = get_provisionstatus
+		$provstatus = get_vmconfig
 		foreach($k in $provstatus.Keys) {
 			if($provstatus[$k] -ne $True) {
 				Write-Warning "devgineering-vm: $k Incorrect"
@@ -304,7 +286,9 @@ if($Module -eq 'status') {
 		}
 	}
 
-	Start-VM $VMName
+	if($status -lt [VMStatus]::Running) {
+		Start-VM $VMName
+	}
 } elseif($Module -eq 'templatesync') {
 	if(-Not $BoxFile) {
 		Write-Error "-BoxFile not specified"
