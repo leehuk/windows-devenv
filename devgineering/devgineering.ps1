@@ -10,8 +10,7 @@
 # from updated packer images -- without losing git repos etc.
 
 param (
-	[string]$Module  = "vm",
-	[string]$Command = "help",
+	[string]$Module  = "help",
 
 	# template provision
 	[string]$BoxFile
@@ -44,22 +43,12 @@ function display_help {
 	Write-Host
 	Write-Host "[devgineering] Dev VM Builder"
 	Write-Host
-	Write-Host " status - Show Status Information"
+	Write-Host " status          - Show Status Information"
 	Write-Host
-	Write-Host " env - Manage Dev Environment"
-	Write-Host "   env status         - Show status of dev environment"
-	Write-Host
-	Write-Host " vm - Manage Virtual Machine"
-	Write-Host
-	Write-Host "   vm destroy         - Destroys the dev VM"
-	Write-Host "   vm provision       - Provisions the dev VM"
-	Write-Host "   vm start           - Start the dev VM"
-	Write-Host "   vm stop            - Stop the dev VM"
-	Write-Host
-	Write-Host " template - Manage VHD Template"
-	Write-Host
-	Write-Host "   template provision - Provision packer box to HyperV VHD template"
-	Write-Host "                        Parameters: <-BoxFile /path/to/box>"
+	Write-Host " destroy         - Destroy VM"
+	Write-Host " stop            - Stop VM"
+	Write-Host " templatesync    - Provision VHD Template"
+	Write-Host " up              - Provision Environment"
 	Write-Host
 	Write-Host " help - This help"
 	Write-Host
@@ -96,6 +85,7 @@ function get_vmstatus {
 function get_provisionstatus {
 	$status = @{
 		'BootOrder'			= $False
+		'Checkpoints'		= $False
 		'CPUCount'			= $False
 		'DiskRoot'          = $False
 		'DiskRootAttached'  = $False
@@ -105,11 +95,13 @@ function get_provisionstatus {
 		'SecureBoot'		= $False
 	}
 
-	$vm = Get-VM -Name $VMName -ErrorAction Ignore
-	if(-Not $vm) {
+	if(-Not (get_vmexist)) {
 		return $status
 	}
 
+	if((Get-VM $VMName).CheckpointType -eq "Disabled") {
+		$status['Checkpoints'] = $True
+	}
 	if((Get-Item $VMRootVHDPath -ErrorAction Ignore)) {
 		$status['DiskRoot'] = $True
 	}
@@ -161,6 +153,10 @@ function get_envinfo {
 		'IPAddress'	= $False
 	}
 
+	if(-Not (get_vmexist)) {
+		return $status
+	}
+
 	$vmnic = (Get-VM -Name $VMName).NetworkAdapters
 	($vmnic).IPAddresses | Foreach-Object -Process {
 		if($_ -Match "^172.31.255.") {
@@ -171,20 +167,74 @@ function get_envinfo {
 	return $status
 }
 
-if($Module -eq 'status') {
+function provision_vm {
+	$status = get_vmstatus
+	if($status -le [VMStatus]::NotCreated) {
+		try {
+			New-VM -Name $VMName -MemoryStartupBytes $VMMemory -Generation 2 -BootDevice VHD -SwitchName HyperV-NAT -ErrorAction stop | Out-Null
+		} catch {
+			Write-Error "Unable to create VM"
+			throw
+		}
+	}
+
+	$template = Get-Item "$TemplateVHDPath" -ErrorAction Ignore
+	if(-Not $template) {
+		Write-Error "Template is not provisioned"
+		exit
+	}
+
+	$provstatus = get_provisionstatus
+
+	# Ensure checkpoints are disabled
+	if(-Not $provstatus['Checkpoints']) {
+		Set-VM $VMName -CheckpointType Disabled
+	}
+
+	# Provision our root disk file, by cloning the template.
+	if(-Not $provstatus['DiskRoot']) {
+		Import-Module BitsTransfer
+		Start-BitsTransfer -Source "$TemplateVHDPath" -Destination "$VMRootVHDPath" -Description "Cloning VHDX" -DisplayName "Cloning VHDX"
+	}
+
+	# Provision a new storage drive.  This will only ever be done once.
+	if(-Not $provstatus['DiskStore']) {
+		New-VHD -Path "$VMStoreVHDPath" -SizeBytes 20GB | Out-Null
+	}
+
+	if(-Not $provstatus['DiskRootAttached']) {
+		Add-VMHardDiskDrive $VMName -ControllerType SCSI -ControllerNumber 0 -ControllerLocation 0 -Path $VMRootVHDPath
+	}
+
+	if(-Not $provstatus['DiskRootAttached']) {
+		Add-VMHardDiskDrive $VMName -ControllerType SCSI -ControllerNumber 0 -ControllerLocation 1 -Path $VMStoreVHDPath
+	}
+
+	if(-Not $provstatus['BootOrder']) {
+		$bootdevice =  Get-VMHardDiskDrive devgineering -ControllerNumber 0 -ControllerLocation 0
+		Set-VMFirmware $VMName -BootOrder $bootdevice
+	}
+
+	if(-Not $provstatus['SecureBoot']) {
+		Set-VMFirmware $VMName -EnableSecureBoot Off
+	}
+
+	if(-Not $provstatus['CPUCount']) {
+		Set-VMProcessor $VMName -Count $VMCPU
+	}
+}
+
+function run_status {
 	$template = Get-Item "$TemplateVHDPath" -ErrorAction Ignore
 	if($template) {
 		Write-Host "devgineering-template: Provisioned"
 
-		$info = Get-Item "$TemplateInfoPath" -ErrorAction Ignore
-		if($info) {
-			$content = Get-Content $info
+		if(($content = Get-Item "$TemplateInfoPath" -ErrorAction Ignore | Get-Content)) {
 			Write-Host "devgineering-template: $content"
 		}
 	} else {
 		Write-Host "devgineering-template: Unprovisioned"
 	}
-
 
 	$status = get_vmstatus
 	Write-Host "devgineering-vm: $status"
@@ -197,163 +247,109 @@ if($Module -eq 'status') {
 	}
 
 	Write-Host "devgineering-vm:$status"
-		
-} elseif($Module -eq 'vm') {
-	if($Command -eq "destroy") {
-		$status = get_vmstatus
-		if($status -le [VMStatus]::NotCreated) {
-			Write-Host "$VMName is $status"
-			exit
-		}
 
-		if($status -eq [VMStatus]::Running) {
-			Stop-VM $VMName
-		}
+	$status = get_envstatus
+	Write-Host "devgineering-env: $status"
 
-		$confirm = Read-Host "This will permanently *DESTROY* the VM and its root hard disk.  Enter YES to continue"
-		if($confirm -eq "YES") {
-			Get-VMHardDiskDrive $VMName | Remove-VMHardDiskDrive
-			Remove-Item $VMRootVHDPath -ErrorAction Ignore
-			Remove-VM $VMName -Force
-		} else {
-			Write-Host "Aborted"
-		}
-	} elseif($Command -eq "provision") {
-		$status = get_vmstatus
-		if($status -le [VMStatus]::NotCreated) {
-			try {
-				New-VM -Name $VMName -MemoryStartupBytes $VMMemory -Generation 2 -BootDevice VHD -SwitchName HyperV-NAT -ErrorAction stop | Out-Null
-			} catch {
-				Write-Error "Unable to create VM"
-				throw
-			}
-		} 
-
-		$template = Get-Item "$TemplateVHDPath" -ErrorAction Ignore
-		if(-Not $template) {
-			Write-Error "Template is not provisioned"
-			exit
-		}
-
-		if($status -lt [VMStatus]::Provisioned) {
-			$provstatus = get_provisionstatus
-
-			# Provision our root disk file, by cloning the template.
-			if(-Not $provstatus['DiskRoot']) {
-				Import-Module BitsTransfer
-				Start-BitsTransfer -Source "$TemplateVHDPath" -Destination "$VMRootVHDPath" -Description "Cloning VHDX" -DisplayName "Cloning VHDX"
-			}
-			
-			# Provision a new storage drive.  This will only ever be done once.
-			if(-Not $provstatus['DiskStore']) {
-				New-VHD -Path "$VMStoreVHDPath" -SizeBytes 20GB | Out-Null
-			}
-
-			if(-Not $provstatus['DiskRootAttached']) {
-				Add-VMHardDiskDrive $VMName -ControllerType SCSI -ControllerNumber 0 -ControllerLocation 0 -Path $VMRootVHDPath
-			}
-
-			if(-Not $provstatus['DiskRootAttached']) {
-				Add-VMHardDiskDrive $VMName -ControllerType SCSI -ControllerNumber 0 -ControllerLocation 1 -Path $VMStoreVHDPath
-			}
-
-			if(-Not $provstatus['BootOrder']) {
-				$bootdevice =  Get-VMHardDiskDrive devgineering -ControllerNumber 0 -ControllerLocation 0
-				Set-VMFirmware $VMName -BootOrder $bootdevice
-			}
-
-			if(-Not $provstatus['SecureBoot']) {
-				Set-VMFirmware $VMName -EnableSecureBoot Off
-			}
-
-			if(-Not $provstatus['CPUCount']) {
-				Set-VMProcessor $VMName -Count $VMCPU
-			}
-		}
-	# vm start
-	} elseif($Command -eq 'start') {
-		$status = get_vmstatus
-		if($status -lt [VMStatus]::Provisioned) {
-			Write-Error "$VMName is not provisioned"
-			exit
-		}
-
-		Start-VM $VMName
-	# vm stop
-	} elseif($Command -eq 'stop') {
-		$status = get_vmstatus
-		if($status -lt [VMStatus]::Running) {
-			Write-Error "$VMName is not running"
-			exit
-		}
-
-		Stop-VM $VMName
-	} else {
-		display_help
-	}
-} elseif($Module -eq 'template') {
-	# template provision
-	if($Command -eq "provision") {
-		if(-Not $BoxFile) {
-			Write-Error "-BoxFile not specified"
-			exit
-		}
-
-		$boxinfo = Get-Item $BoxFile -ErrorAction Ignore
-		if(-Not $boxinfo) {
-			Write-Error "$BoxFile not found"
-			exit
-		}
-
-		# Cleanup existing template files
-		if((Get-Item "$TemplateVHDPath" -ErrorAction Ignore)) {
-			Remove-Item "$TemplateVHDPath"
-		}
-
-		if((Get-Item "$TemplateInfoPath" -ErrorAction Ignore)) {
-			Remove-Item "$TemplateInfoPath"
-		}
-
-		$temppath = "$env:TEMP\devgineering"
-		$tempvhdpath = "$temppath\build\Virtual Hard Disks"
-
-		if((Get-Item "$temppath" -ErrorAction Ignore)) {
-			Remove-Item "$temppath"
-		}
-
-		# The first extract gives us the tar file, the second the actual contents
-		Expand-Archive $BoxFile -DestinationPath "$temppath"
-
-		$files = Get-Item "$tempvhdpath\*.vhdx" -ErrorAction Ignore
-		if($files.Count -ne 1) {
-			Write-Error "Unable to find exactly one VHDX file in $tempvhdpath"
-		}
-
-		# We have our VHDX file, lets move it over and add some info
-		$diskpath = $tempvhdpath + "\" + $files[0].Name
-		Move-Item "$diskpath" "$TemplateVHDPath"
-
-		$infotext = "From $BoxFile at " + $boxinfo.LastWriteTime
-		New-Item -Path "$VHDPath" -Name "devgineering-template.info" -Value "$infotext" | Out-Null
-
-		# Cleanup temporary path
-		Remove-Item -Recurse "$temppath"
-	} else {
-		display_help
-	}
-} elseif($Module -eq 'env') {
-	if($Command -eq "status") {
-		$status = get_envstatus
-		Write-Host "$VMName Environment is $status"
-
+	if($status -ge [EnvStatus]::Provisioned) {
 		$info = get_envinfo
-		if($status -ge [EnvStatus]::Provisioned) {
-			Write-Host
-			Write-Host "IP Address:", $info['IPAddress']
-		}
-	} else {
-		display_help
+		Write-Host "devgineering-env: IP", $info['IPAddress']
 	}
+}
+
+if($Module -eq 'status') {
+	run_status
+} elseif($Module -eq 'destroy') {
+	$status = get_vmstatus
+	if($status -le [VMStatus]::NotCreated) {
+		exit
+	}
+
+	if($status -ge [VMStatus]::Running) {
+		Stop-VM $VMName
+	}
+
+	$confirm = Read-Host "This will permanently *DESTROY* the VM and its root hard disk.  Enter YES to continue"
+	if($confirm -eq "YES") {
+		Get-VMHardDiskDrive $VMName | Remove-VMHardDiskDrive
+		Remove-Item $VMRootVHDPath -ErrorAction Ignore
+		Remove-VM $VMName -Force
+	} else {
+		Write-Host "Aborted"
+	}
+} elseif($Module -eq 'stop') {
+	$status = get_vmstatus
+	if($status -lt [VMStatus]::Running) {
+		exit
+	}
+
+	Stop-VM $VMName
+} elseif($Module -eq 'up') {
+	provision_vm
+
+	$status = get_vmstatus
+	if($status -lt [VMStatus]::Provisioned) {
+		Write-Warning "devgineering-vm: Unprovisioned"
+
+		$provstatus = get_provisionstatus
+		foreach($k in $provstatus.Keys) {
+			if($provstatus[$k] -ne $True) {
+				Write-Warning "devgineering-vm: $k Incorrect"
+			}
+		}
+
+		$confirm = Read-Host "Enter YES to continue"
+		if($confirm -ne "YES") {
+			exit
+		}
+	}
+
+	Start-VM $VMName
+} elseif($Module -eq 'templatesync') {
+	if(-Not $BoxFile) {
+		Write-Error "-BoxFile not specified"
+		exit
+	}
+
+	$boxinfo = Get-Item $BoxFile -ErrorAction Ignore
+	if(-Not $boxinfo) {
+		Write-Error "$BoxFile not found"
+		exit
+	}
+
+	# Cleanup existing template files
+	if((Get-Item "$TemplateVHDPath" -ErrorAction Ignore)) {
+		Remove-Item "$TemplateVHDPath"
+	}
+
+	if((Get-Item "$TemplateInfoPath" -ErrorAction Ignore)) {
+		Remove-Item "$TemplateInfoPath"
+	}
+
+	$temppath = "$env:TEMP\devgineering"
+	$tempvhdpath = "$temppath\build\Virtual Hard Disks"
+
+	if((Get-Item "$temppath" -ErrorAction Ignore)) {
+		Remove-Item "$temppath"
+	}
+
+	# The first extract gives us the tar file, the second the actual contents
+	Expand-Archive $BoxFile -DestinationPath "$temppath"
+
+	$files = Get-Item "$tempvhdpath\*.vhdx" -ErrorAction Ignore
+	if($files.Count -ne 1) {
+		Write-Error "Unable to find exactly one VHDX file in $tempvhdpath"
+	}
+
+	# We have our VHDX file, lets move it over and add some info
+	$diskpath = $tempvhdpath + "\" + $files[0].Name
+	Move-Item "$diskpath" "$TemplateVHDPath"
+
+	$infotext = "From $BoxFile at " + $boxinfo.LastWriteTime
+	New-Item -Path "$VHDPath" -Name "devgineering-template.info" -Value "$infotext" | Out-Null
+
+	# Cleanup temporary path
+	Remove-Item -Recurse "$temppath"
 } else {
 	display_help
 }
