@@ -197,7 +197,7 @@ function provision_vm {
 		Add-VMHardDiskDrive $VMName -ControllerType SCSI -ControllerNumber 0 -ControllerLocation 0 -Path $VMRootVHDPath
 	}
 
-	if(-Not $provstatus['DiskRootAttached']) {
+	if(-Not $provstatus['DiskStoreAttached']) {
 		Add-VMHardDiskDrive $VMName -ControllerType SCSI -ControllerNumber 0 -ControllerLocation 1 -Path $VMStoreVHDPath
 	}
 
