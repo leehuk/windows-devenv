@@ -242,12 +242,54 @@ function provision_ssh {
 
 	$result = $(ssh -i $SSHKeyFile -o StrictHostKeyChecking=false -o PreferredAuthentications=publickey -l packer $info['IPAddress'] whoami 2>&1)
 	if($result -ne "packer") {
-		Write-Host "$VMName: SSH Setup Required"
+		Write-Host "${VMName}: SSH Setup Required"
 		Write-Host "When prompted for a password, enter 'packer'"
 
 		$pubkey = (Get-Item $SSHKeyPubFile | Get-Content)
 		ssh -l packer $info['IPAddress'] "mkdir -p .ssh && chmod 700 .ssh && echo '$pubkey' > .ssh/authorized_keys && chmod 600 .ssh/authorized_keys"
 	}
+}
+
+function provision_packages {
+	# If we still have the default packages around, also run an upgrade
+	$result = exec_ssh "rpm -q audit dosfstools GeoIP pinentry polkit trousers 2>/dev/null | grep -v 'not installed' | wc -l"
+	if($result -gt 0) {
+		Write-Progress "Removing unwanted default packages via dnf"
+		$output = exec_ssh "sudo dnf remove -y audit dosfstools GeoIP pinentry polkit trousers"
+		Write-Progress "Removing unwanted default packages via dnf" -Completed
+
+		Write-Progress "Performing dnf upgrade"
+		$output = exec_ssh "sudo dnf upgrade -y --setopt=install_weak_deps=False"
+		Write-Progress "Performing dnf upgrade" -Completed
+	}
+
+	$result = exec_ssh "rpm -q git 2>/dev/null | wc -l"
+	if($result -eq 0) {
+		Write-Progress "Installing git"
+		exec_ssh "sudo dnf install -y git"
+		Write-Progress "Installing git" -Completed
+	}
+}
+
+function provision_ansible {
+	$result = exec_ssh "ls -d /.ansible/ansible-setup 2>/dev/null | wc -l"
+	if($result -eq 0) {
+		$apikey = Read-Host "Enter ansible-bootstrap api key"
+		exec_ssh "sudo mkdir -p /.ansible && sudo git clone https://leehuk:${apikey}@gitlab.com/leehuk/ansible-setup.git /.ansible/ansible-setup"
+
+		exec_ssh "sudo /.ansible/ansible-setup/bootstrap.sh $VMName $apikey"
+	}
+}
+
+function exec_ssh([String]$SSHCommand = '') {
+	$info = get_vminfo
+
+	if($SSHCommand) {
+		$output = $(ssh -i $SSHKeyFile -o PreferredAuthentications=publickey -l packer $info['IPAddress'] $SSHCommand)
+		return $output
+	}
+
+	ssh -i $SSHKeyFile -o PreferredAuthentications=publickey -l packer $info['IPAddress']
 }
 
 function run_status {
@@ -277,12 +319,7 @@ function run_status {
 		$status = "$status $k=$v"
 	}
 
-	Write-Host "devgineering-vm:$status"
-}
-
-function run_ssh {
-	$vminfo = get_vminfo
-	ssh -i $SSHKeyFile -o PreferredAuthentications=publickey -l packer $vminfo['IPAddress']
+	Write-Host "$VMName-vm:$status"
 }
 
 if($Module -eq 'status') {
@@ -353,6 +390,8 @@ if($Module -eq 'status') {
 	}
 
 	provision_ssh
+	provision_packages
+	provision_ansible
 } elseif($Module -eq 'templatesync') {
 	if(-Not $BoxFile) {
 		Write-Error "-BoxFile not specified"
@@ -405,7 +444,7 @@ if($Module -eq 'status') {
 		exit
 	}
 
-	run_ssh
+	exec_ssh
 } else {
 	display_help
 }
