@@ -252,7 +252,7 @@ function provision_ssh {
 
 function provision_packages {
 	# If we still have the default packages around, also run an upgrade
-	$result = exec_ssh "rpm -q audit dosfstools GeoIP pinentry polkit trousers 2>/dev/null | grep -v 'not installed' | wc -l"
+	$result = exec_ssh "rpm -q audit dosfstools GeoIP pinentry polkit trousers | grep -v 'not installed' | wc -l"
 	if($result -gt 0) {
 		Write-Progress "Removing unwanted default packages via dnf"
 		$output = exec_ssh "sudo dnf remove -y audit dosfstools GeoIP pinentry polkit trousers"
@@ -263,16 +263,16 @@ function provision_packages {
 		Write-Progress "Performing dnf upgrade" -Completed
 	}
 
-	$result = exec_ssh "rpm -q git 2>/dev/null | wc -l"
+	$result = exec_ssh "rpm -q git | grep -v 'not installed' | wc -l"
 	if($result -eq 0) {
 		Write-Progress "Installing git"
-		exec_ssh "sudo dnf install -y git"
+		$output = exec_ssh "sudo dnf install -y git"
 		Write-Progress "Installing git" -Completed
 	}
 }
 
 function provision_ansible {
-	$result = exec_ssh "ls -d /.ansible/ansible-setup 2>/dev/null | wc -l"
+	$result = exec_ssh "ls -d /store/ansible/ansible-setup 2>/dev/null | wc -l"
 	if($result -eq 0) {
 		$apikey = Read-Host "Enter ansible-bootstrap api key"
 		exec_ssh "sudo mkdir -p /.ansible && sudo git clone https://leehuk:${apikey}@gitlab.com/leehuk/ansible-setup.git /.ansible/ansible-setup"
