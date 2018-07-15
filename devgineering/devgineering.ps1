@@ -240,7 +240,7 @@ function provision_ssh {
 		return
 	}
 
-	$result = $(ssh -i $SSHKeyFile -o StrictHostKeyChecking=false,PreferredAuthentications=publickey -l packer $info['IPAddress'] whoami 2>&1)
+	$result = $(ssh -i $SSHKeyFile -o StrictHostKeyChecking=false -o PreferredAuthentications=publickey -l packer $info['IPAddress'] whoami 2>&1)
 	if($result -ne "packer") {
 		Write-Host "devgineering-vm: SSH Setup Required"
 		Write-Host "When prompted for a password, enter 'packer'"
