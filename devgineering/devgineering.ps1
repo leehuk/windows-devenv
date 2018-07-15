@@ -29,10 +29,10 @@ $VMMemory = (2*1024*1024*1024)
 $VMCPU = 2
 
 $VHDPath = "C:\HyperV\VHDs"
-$TemplateVHDPath = "$VHDPath\devgineering-template.vhdx"
-$TemplateInfoPath = "$VHDPath\devgineering-template.info"
-$VMRootVHDPath = "$VHDPath\devgineering-root.vhdx"
-$VMStoreVHDPath = "$VHDPath\devgineering-store.vhdx"
+$TemplateVHDPath = "$VHDPath\$VMName-template.vhdx"
+$TemplateInfoPath = "$VHDPath\$VMName-template.info"
+$VMRootVHDPath = "$VHDPath\$VMName-root.vhdx"
+$VMStoreVHDPath = "$VHDPath\$VMName-store.vhdx"
 
 $SSHKeyFolder = "C:\HyperV\packer.ssh"
 $SSHKeyFile = "$SSHKeyFolder\id_ed25519"
@@ -40,11 +40,11 @@ $SSHKeyPubFile = "$SSHKeyFile.pub"
 
 function display_help {
 	Write-Host
-	Write-Host "[devgineering] Dev VM Builder"
+	Write-Host "[$VMName] Dev VM Builder"
 	Write-Host
 	Write-Host " status          - Show Status Information"
 	Write-Host
-	Write-Host " up              - Provision Environment"
+	Write-Host " up              - Provision VM"
 	Write-Host " stop            - Stop VM"
 	Write-Host " destroy         - Destroy VM"
 	Write-Host " ssh             - SSH to VM"
@@ -202,7 +202,7 @@ function provision_vm {
 	}
 
 	if(-Not $provstatus['BootOrder']) {
-		$bootdevice =  Get-VMHardDiskDrive devgineering -ControllerNumber 0 -ControllerLocation 0
+		$bootdevice =  Get-VMHardDiskDrive $VMName -ControllerNumber 0 -ControllerLocation 0
 		Set-VMFirmware $VMName -BootOrder $bootdevice
 	}
 
@@ -225,24 +225,24 @@ function provision_ssh {
 	}
 
 	if(-Not (Get-Item $SSHKeyPubFile -ErrorAction Ignore)) {
-		Write-Host "devgineering-vm: Error: Found private key file, but missing public key file"
+		Write-Host "$VMName-vm: Error: Found private key file, but missing public key file"
 		return
 	}
 
 	if((Get-Item $SSHKeyPubFile | Get-Content).Count -ne 1) {
-		Write-Host "devgineering-vm: Error: Public key file has multiple lines"
+		Write-Host "$VMName-vm: Error: Public key file has multiple lines"
 		return
 	}
 
 	$info = get_vminfo
 	if(-Not $info['IPAddress'] -Match '^172.31.255.[0-9]+') {
-		Write-Host "devgineering-vm: Error: Invalid IP Address:", $info['IPAddress']
+		Write-Host "$VMName-vm: Error: Invalid IP Address:", $info['IPAddress']
 		return
 	}
 
 	$result = $(ssh -i $SSHKeyFile -o StrictHostKeyChecking=false -o PreferredAuthentications=publickey -l packer $info['IPAddress'] whoami 2>&1)
 	if($result -ne "packer") {
-		Write-Host "devgineering-vm: SSH Setup Required"
+		Write-Host "$VMName: SSH Setup Required"
 		Write-Host "When prompted for a password, enter 'packer'"
 
 		$pubkey = (Get-Item $SSHKeyPubFile | Get-Content)
@@ -253,21 +253,21 @@ function provision_ssh {
 function run_status {
 	$template = Get-Item "$TemplateVHDPath" -ErrorAction Ignore
 	if($template) {
-		Write-Host "devgineering-template: Provisioned"
+		Write-Host "$VMName-template: Provisioned"
 
 		if(($content = Get-Item "$TemplateInfoPath" -ErrorAction Ignore | Get-Content)) {
-			Write-Host "devgineering-template: $content"
+			Write-Host "$VMName-template: $content"
 		}
 	} else {
-		Write-Host "devgineering-template: Created"
+		Write-Host "$VMName-template: Created"
 	}
 
 	$status = get_vmstatus
-	Write-Host "devgineering-vm: $status"
+	Write-Host "$VMName-vm: $status"
 
 	if($status -ge [VMStatus]::Running) {
 		$info = get_vminfo
-		Write-Host "devgineering-vm: IP", $info['IPAddress']
+		Write-Host "$VMName-vm: IP", $info['IPAddress']
 	}
 
 	$provstatus = get_vmconfig
@@ -317,12 +317,12 @@ if($Module -eq 'status') {
 
 	$status = get_vmstatus
 	if($status -lt [VMStatus]::Configured) {
-		Write-Warning "devgineering-vm: Not Configured Correctly"
+		Write-Warning "$VMName-vm: Not Configured Correctly"
 
 		$provstatus = get_vmconfig
 		foreach($k in $provstatus.Keys) {
 			if($provstatus[$k] -ne $True) {
-				Write-Warning "devgineering-vm: $k Incorrect"
+				Write-Warning "$VMName-vm: $k Incorrect"
 			}
 		}
 
@@ -374,7 +374,7 @@ if($Module -eq 'status') {
 		Remove-Item "$TemplateInfoPath"
 	}
 
-	$temppath = "$env:TEMP\devgineering"
+	$temppath = "$env:TEMP\$VMName"
 	$tempvhdpath = "$temppath\build\Virtual Hard Disks"
 
 	if((Get-Item "$temppath" -ErrorAction Ignore)) {
@@ -394,14 +394,14 @@ if($Module -eq 'status') {
 	Move-Item "$diskpath" "$TemplateVHDPath"
 
 	$infotext = "From $BoxFile at " + $boxinfo.LastWriteTime
-	New-Item -Path "$VHDPath" -Name "devgineering-template.info" -Value "$infotext" | Out-Null
+	New-Item -Path "$VHDPath" -Name "$VMName-template.info" -Value "$infotext" | Out-Null
 
 	# Cleanup temporary path
 	Remove-Item -Recurse "$temppath"
 } elseif($Module -eq "ssh") {
 	$status = get_vmstatus
 	if($status -lt [VMStatus]::Running) {
-		Write-Host "devgineering-vm: Not Running"
+		Write-Host "$VMName-vm: Not Provisioned"
 		exit
 	}
 
