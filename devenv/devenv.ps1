@@ -294,7 +294,10 @@ function exec_ssh([String]$SSHCommand = '') {
 	$info = get_vminfo
 
 	if($SSHCommand) {
-		$output = $(ssh -i $SSHKeyFile -o PreferredAuthentications=publickey -l packer $info['IPAddress'] $SSHCommand)
+		$output = ssh -i $SSHKeyFile -o PreferredAuthentications=publickey -l packer $info['IPAddress'] $SSHCommand 2>&1
+		if($? -ne $True) {
+			Write-Error "$output" -ErrorAction Stop
+		}
 		return $output
 	}
 
