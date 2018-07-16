@@ -24,15 +24,16 @@ enum VMStatus {
 	Provisioned   = 4
 }
 
-$VMName = "devgineering"
+$VMNameShort = "dev-fedora"
+$VMName = "${VMNameShort}.loc.lhsys.uk"
 $VMMemory = (2*1024*1024*1024)
 $VMCPU = 2
 
 $VHDPath = "C:\HyperV\VHDs"
-$TemplateVHDPath = "$VHDPath\$VMName-template.vhdx"
-$TemplateInfoPath = "$VHDPath\$VMName-template.info"
-$VMRootVHDPath = "$VHDPath\$VMName-root.vhdx"
-$VMStoreVHDPath = "$VHDPath\$VMName-store.vhdx"
+$TemplateVHDPath = "$VHDPath\$VMNameShort-template.vhdx"
+$TemplateInfoPath = "$VHDPath\$VMNameShort-template.info"
+$VMRootVHDPath = "$VHDPath\$VMNameShort-root.vhdx"
+$VMStoreVHDPath = "$VHDPath\$VMNameShort-store.vhdx"
 
 $SSHKeyFolder = "C:\HyperV\packer.ssh"
 $SSHKeyFile = "$SSHKeyFolder\id_ed25519"
@@ -254,21 +255,29 @@ function provision_packages {
 	# If we still have the default packages around, also run an upgrade
 	$result = exec_ssh "rpm -q audit dosfstools GeoIP pinentry polkit trousers | grep -v 'not installed' | wc -l"
 	if($result -gt 0) {
-		Write-Progress "Removing unwanted default packages via dnf"
+		Write-Progress "Removing unwanted default packages via dnf."
 		$output = exec_ssh "sudo dnf remove -y audit dosfstools GeoIP pinentry polkit trousers"
-		Write-Progress "Removing unwanted default packages via dnf" -Completed
+		Write-Progress "Removing unwanted default packages via dnf." -Completed
 
-		Write-Progress "Performing dnf upgrade"
+		Write-Progress "Performing dnf upgrade.  This will take some time."
 		$output = exec_ssh "sudo dnf upgrade -y --setopt=install_weak_deps=False"
-		Write-Progress "Performing dnf upgrade" -Completed
+		Write-Progress "Performing dnf upgrade.  This will take some time." -Completed
 	}
 
 	$result = exec_ssh "rpm -q git | grep -v 'not installed' | wc -l"
 	if($result -eq 0) {
-		Write-Progress "Installing git"
+		Write-Progress "Installing git."
 		$output = exec_ssh "sudo dnf install -y git"
-		Write-Progress "Installing git" -Completed
+		Write-Progress "Installing git." -Completed
 	}
+
+	$result = exec_ssh "rpm -q ansible | grep -v 'not installed' | wc -l"
+	if($result -eq 0) {
+		Write-Progress "Installing ansible."
+		$output = exec_ssh "sudo dnf install -y ansible"
+		Write-Progress "Installing ansible." -Completed
+	}
+
 }
 
 function provision_ansible {
