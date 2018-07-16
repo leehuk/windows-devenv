@@ -442,7 +442,7 @@ if($Module -eq 'status') {
 	Move-Item "$diskpath" "$TemplateVHDPath"
 
 	$infotext = "From $BoxFile at " + $boxinfo.LastWriteTime
-	New-Item -Path "$VHDPath" -Name "$VMName-template.info" -Value "$infotext" | Out-Null
+	New-Item -Path "$TemplateInfoPath" -Value "$infotext" | Out-Null
 
 	# Cleanup temporary path
 	Remove-Item -Recurse "$temppath"
