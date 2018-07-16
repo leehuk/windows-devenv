@@ -284,8 +284,9 @@ function provision_ansible {
 	$result = exec_ssh "ls -d /store/ansible/ansible-setup 2>/dev/null | wc -l"
 	if($result -eq 0) {
 		$apikey = Read-Host "Enter ansible-bootstrap api key"
-		exec_ssh "sudo mkdir -p /.ansible && sudo git clone https://leehuk:${apikey}@gitlab.com/leehuk/ansible-setup.git /.ansible/ansible-setup"
-
+		exec_ssh "sudo mkdir -p /.ansible"
+		exec_ssh "sudo rm -rf /.ansible/ansible-setup"
+		exec_ssh "sudo git clone -q https://leehuk:${apikey}@gitlab.com/leehuk/ansible-setup.git /.ansible/ansible-setup"
 		exec_ssh "sudo /.ansible/ansible-setup/bootstrap.sh $VMName $apikey"
 	}
 }
@@ -294,7 +295,7 @@ function exec_ssh([String]$SSHCommand = '') {
 	$info = get_vminfo
 
 	if($SSHCommand) {
-		$output = ssh -i $SSHKeyFile -o PreferredAuthentications=publickey -l packer $info['IPAddress'] $SSHCommand 2>&1
+		$output = ssh -i $SSHKeyFile -o PreferredAuthentications=publickey -l packer $info['IPAddress'] $SSHCommand
 		if($? -ne $True) {
 			Write-Error "$output" -ErrorAction Stop
 		}
