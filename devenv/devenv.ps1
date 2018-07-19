@@ -302,7 +302,7 @@ function exec_ssh([String]$SSHCommand = '', [Bool]$Interactive = $False) {
 			}
 			return $output
 		} else {
-			ssh -i $SSHKeyFile -o PreferredAuthentications=publickey -l packer $info['IPAddress'] $SSHCommand
+			ssh -ti $SSHKeyFile -o PreferredAuthentications=publickey -l packer $info['IPAddress'] $SSHCommand
 		}
 	}
 
