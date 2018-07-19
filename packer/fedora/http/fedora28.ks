@@ -25,9 +25,9 @@ clearpart --none --initlabel
 part /boot/efi --fstype="efi" --ondisk=sda --size=256 --fsoptions="umask=0077,shortname=winnt"
 part /boot --fstype="xfs" --ondisk=sda --size=256
 part pv.406 --fstype="lvmpv" --ondisk=sda --grow
-volgroup vg0 --pesize=4096 pv.406
-logvol /var/log  --fstype="xfs" --size=64 --name=log --vgname=vg0
-logvol /  --fstype="xfs" --size=4096 --name=root --vgname=vg0
+volgroup vg_root --pesize=4096 pv.406
+logvol /var/log  --fstype="xfs" --size=128 --name=log --vgname=vg_root
+logvol /  --fstype="xfs" --size=3072 --name=root --vgname=vg_root
 
 %packages
 @core --nodefaults

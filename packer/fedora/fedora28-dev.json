@@ -7,7 +7,7 @@
 		"vm_name": "packer-fedora28-box",
 		"cpu": "2",
 		"ram_size": "2048",
-		"disk_size": "10000",
+		"disk_size": "15000",
 		"switch_name": "HyperV-NAT",
 		"generation": "2",
 
