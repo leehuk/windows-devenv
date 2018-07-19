@@ -3,7 +3,7 @@ install
 reboot
 text
 url --url=https://mirror.bytemark.co.uk/fedora/linux/releases/28/Everything/x86_64/os/
-repo --name fedora-updates
+repo --name updates
 # System authorization information
 auth --enableshadow --passalgo=sha512
 ignoredisk --only-use=sda
