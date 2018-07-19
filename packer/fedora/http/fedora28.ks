@@ -32,6 +32,7 @@ logvol /  --fstype="xfs" --size=3072 --name=root --vgname=vg_root
 
 %packages
 @core --nodefaults
+tar
 virt-what
 %end
 
