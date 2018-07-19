@@ -287,19 +287,23 @@ function provision_ansible {
 		exec_ssh "sudo mkdir -p /.ansible"
 		exec_ssh "sudo rm -rf /.ansible/ansible-setup"
 		exec_ssh "sudo git clone -q https://leehuk:${apikey}@gitlab.com/leehuk/ansible-setup.git /.ansible/ansible-setup"
-		exec_ssh "sudo /.ansible/ansible-setup/bootstrap.sh $VMName $apikey"
+		exec_ssh "sudo /.ansible/ansible-setup/bootstrap.sh $VMName $apikey leeh" $True
 	}
 }
 
-function exec_ssh([String]$SSHCommand = '') {
+function exec_ssh([String]$SSHCommand = '', [Bool]$Interactive = $False) {
 	$info = get_vminfo
 
 	if($SSHCommand) {
-		$output = ssh -i $SSHKeyFile -o PreferredAuthentications=publickey -l packer $info['IPAddress'] $SSHCommand
-		if($? -ne $True) {
-			Write-Error "$output" -ErrorAction Stop
+		if(-Not $Interactive) {
+			$output = ssh -i $SSHKeyFile -o PreferredAuthentications=publickey -l packer $info['IPAddress'] $SSHCommand
+			if($? -ne $True) {
+				Write-Error "$output" -ErrorAction Stop
+			}
+			return $output
+		} else {
+			ssh -i $SSHKeyFile -o PreferredAuthentications=publickey -l packer $info['IPAddress'] $SSHCommand
 		}
-		return $output
 	}
 
 	ssh -i $SSHKeyFile -o PreferredAuthentications=publickey -l packer $info['IPAddress']
