@@ -304,9 +304,9 @@ function exec_ssh([String]$SSHCommand = '', [Bool]$Interactive = $False) {
 		} else {
 			ssh -ti $SSHKeyFile -o PreferredAuthentications=publickey -l packer $info['IPAddress'] $SSHCommand
 		}
+	} else {
+		ssh -i $SSHKeyFile -o PreferredAuthentications=publickey -l packer $info['IPAddress']
 	}
-
-	ssh -i $SSHKeyFile -o PreferredAuthentications=publickey -l packer $info['IPAddress']
 }
 
 function run_status {
