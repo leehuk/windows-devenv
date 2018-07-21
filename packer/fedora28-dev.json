@@ -27,7 +27,7 @@
 
 	}],
 	"post-processors": [{
-		"output": "../../boxes/fedora28-dev-hyperv-gen2.zip",
+		"output": "../boxes/fedora28-dev-hyperv-gen2.zip",
 		"type": "compress"
 	}]
 }

@@ -27,7 +27,7 @@
 
 	}],
 	"post-processors": [{
-		"output": "../../boxes/fedora27-vagrant-hyperv-gen2.box",
+		"output": "../boxes/fedora27-vagrant-hyperv-gen2.box",
 		"type": "vagrant"
 	}]
 }
