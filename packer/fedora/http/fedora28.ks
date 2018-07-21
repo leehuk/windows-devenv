@@ -33,6 +33,7 @@ logvol /  --fstype="xfs" --size=3072 --name=root --vgname=vg_root
 %packages
 @core --nodefaults
 tar
+vim
 virt-what
 %end
 
