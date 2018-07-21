@@ -281,13 +281,13 @@ function provision_packages {
 }
 
 function provision_ansible {
-	$result = exec_ssh "ls -d /store/ansible/ansible-setup 2>/dev/null | wc -l"
+	$result = exec_ssh "ls -d /store/ansible/ansible-bootstrap 2>/dev/null | wc -l"
 	if($result -eq 0) {
 		$apikey = Read-Host "Enter ansible-bootstrap api key"
 		exec_ssh "sudo mkdir -p /.ansible"
-		exec_ssh "sudo rm -rf /.ansible/ansible-setup"
-		exec_ssh "sudo git clone -q https://leehuk:${apikey}@gitlab.com/leehuk/ansible-setup.git /.ansible/ansible-setup"
-		exec_ssh "sudo /.ansible/ansible-setup/bootstrap.sh $VMName $apikey leeh" $True
+		exec_ssh "sudo rm -rf /.ansible/ansible-bootstrap"
+		exec_ssh "sudo git clone -q https://github.com/leehuk/ansible-bootstrap.git /.ansible/ansible-bootstrap"
+		exec_ssh "sudo /.ansible/ansible-bootstrap/devenv.sh $VMName $apikey leeh" $True
 	}
 }
 
