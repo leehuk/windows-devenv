@@ -13,7 +13,8 @@ param (
 	[string]$Module  = "help",
 
 	# template provision
-	[string]$BoxFile
+	[string]$BoxFile,
+	[string]$Name
 )
 
 enum VMStatus {
@@ -24,7 +25,12 @@ enum VMStatus {
 	Provisioned   = 4
 }
 
-$VMNameShort = "dev-fedora"
+if(-Not $Name) {
+	Write-Error "-Name not specified"
+	exit
+}
+
+$VMNameShort = $Name
 $VMName = "${VMNameShort}.loc.lhsys.uk"
 $VMMemory = (2*1024*1024*1024)
 $VMCPU = 2
