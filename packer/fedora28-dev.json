@@ -23,7 +23,7 @@
 
 		"ssh_username": "packer",
 		"ssh_password": "packer",
-		"ssh_timeout": "1h"
+		"ssh_timeout": "4h"
 
 	}],
 	"post-processors": [{

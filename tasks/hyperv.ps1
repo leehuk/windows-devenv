@@ -40,7 +40,7 @@ try {
 	Write-Host "Found HyperV-NAT Switch"
 } catch {
 	Write-Host "Creating HyperV-NAT Switch"
-	New-VMSwitch -SwitchName "HyperV-NAT” -SwitchType Internal | Out-Null
+	New-VMSwitch -SwitchName "HyperV-NAT" -SwitchType Internal | Out-Null
 }
 
 Write-Host "Checking for NAT Network"
@@ -49,7 +49,7 @@ try {
 	Write-Host "Found NAT Network"
 } catch {
 	Write-Host "Creating NAT Network"
-	New-NetIPAddress -IPAddress 172.31.255.254 -PrefixLength 24 -InterfaceAlias “vEthernet (HyperV-NAT)” | Out-Null
+	New-NetIPAddress -IPAddress 172.31.255.254 -PrefixLength 24 -InterfaceAlias "vEthernet (HyperV-NAT)" | Out-Null
 }
 
 Write-Host "Checking for Hyper-V NAT"

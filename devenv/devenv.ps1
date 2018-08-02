@@ -29,6 +29,8 @@ $VMName = "${VMNameShort}.loc.lhsys.uk"
 $VMMemory = (2*1024*1024*1024)
 $VMCPU = 2
 
+$env:PATH = "$env:PATH;c:\tools\cmder\vendor\git-for-windows\usr\bin"
+
 $VHDPath = "C:\HyperV\VHDs"
 $TemplateVHDPath = "$VHDPath\$VMNameShort-template.vhdx"
 $TemplateInfoPath = "$VHDPath\$VMNameShort-template.info"
