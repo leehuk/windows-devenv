@@ -1,0 +1,33 @@
+{
+	"builders": [{
+		"type": "hyperv-iso",
+		"http_directory": "http",
+		"output_directory": "build",
+
+		"vm_name": "packer-fedora30-box",
+		"cpu": "2",
+		"ram_size": "2048",
+		"disk_size": "20000",
+		"switch_name": "HyperV-NAT",
+		"generation": "2",
+
+		"iso_url": "https://mirror.bytemark.co.uk/fedora/linux/releases/30/Server/x86_64/iso/Fedora-Server-netinst-x86_64-30-1.2.iso",
+		"iso_checksum": "653265fba6e3cd37f14dc417511d239cbece0752",
+		"iso_checksum_type": "sha1",
+
+		"boot_command": [
+			"<up>e<wait><down><down><end> biosdevname=0 ks=http://{{ .HTTPIP }}:{{ .HTTPPort }}/fedora30.ks<leftCtrlOn>x<leftCtrlOff><wait>"
+		],
+		"boot_wait": "10s",
+		"shutdown_command": "sudo shutdown -P now",
+
+		"ssh_username": "packer",
+		"ssh_password": "packer",
+		"ssh_timeout": "4h"
+
+	}],
+	"post-processors": [{
+		"output": "../boxes/fedora30-dev-hyperv-gen2.zip",
+		"type": "compress"
+	}]
+}
